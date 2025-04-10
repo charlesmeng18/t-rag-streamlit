@@ -565,32 +565,19 @@ def main():
     with st.sidebar:
         st.header("Configuration")
         
-        # API key inputs
-        st.subheader("API Keys")
+        # API key status section
+        st.subheader("API Keys Status")
         
-        # OpenAI API key input
-        openai_api_key = st.text_input("OpenAI API Key", type="password", value=st.session_state.OPENAI_API_KEY)
-        if openai_api_key != st.session_state.OPENAI_API_KEY:
-            st.session_state.OPENAI_API_KEY = openai_api_key
-            st.session_state.api_key_set = False
+        # Display API key status
+        openai_key_status = "✅ Present" if st.session_state.OPENAI_API_KEY else "❌ Missing"
+        cleanlab_tlm_key_status = "✅ Present" if st.session_state.CLEANLAB_TLM_API_KEY else "❌ Missing"
+        codex_api_key_status = "✅ Present" if st.session_state.CODEX_API_KEY else "❌ Missing"
+        codex_project_key_status = "✅ Present" if st.session_state.CODEX_PROJECT_KEY else "❌ Missing"
         
-        # Cleanlab API keys section
-        st.subheader("Cleanlab API Keys")
-        
-        # Get Cleanlab API key from environment or secrets
-        cleanlab_tlm_api_key = st.text_input("Cleanlab TLM API Key", type="password", value=st.session_state.CLEANLAB_TLM_API_KEY)
-        if cleanlab_tlm_api_key != st.session_state.CLEANLAB_TLM_API_KEY:
-            st.session_state.CLEANLAB_TLM_API_KEY = cleanlab_tlm_api_key
-        
-        # Get Codex API key from environment or secrets
-        codex_api_key = st.text_input("Cleanlab Codex API Key", type="password", value=st.session_state.CODEX_API_KEY)
-        if codex_api_key != st.session_state.CODEX_API_KEY:
-            st.session_state.CODEX_API_KEY = codex_api_key
-        
-        # Get Codex project key from environment or secrets
-        codex_project_key = st.text_input("Cleanlab Codex Project Key", type="password", value=st.session_state.CODEX_PROJECT_KEY)
-        if codex_project_key != st.session_state.CODEX_PROJECT_KEY:
-            st.session_state.CODEX_PROJECT_KEY = codex_project_key
+        st.markdown(f"**OpenAI API Key:** {openai_key_status}")
+        st.markdown(f"**Cleanlab TLM API Key:** {cleanlab_tlm_key_status}")
+        st.markdown(f"**Cleanlab Codex API Key:** {codex_api_key_status}")
+        st.markdown(f"**Cleanlab Codex Project Key:** {codex_project_key_status}")
         
         # Add a note about setting up secrets
         with st.expander("How to set up API keys"):
@@ -790,13 +777,13 @@ def main():
                         st.success("Analysis complete!")
                         
                         # Evaluate if API key provided
-                        if cleanlab_tlm_api_key:
+                        if st.session_state.CLEANLAB_TLM_API_KEY:
                             with st.spinner("Evaluating response quality..."):
                                 eval_results = evaluate_response(
                                     query=query,
                                     context=str(output['source_documents']),
                                     response=output['result'],
-                                    api_key=cleanlab_tlm_api_key
+                                    api_key=st.session_state.CLEANLAB_TLM_API_KEY
                                 )
                                 st.session_state.eval_results = eval_results
                                 
@@ -834,7 +821,7 @@ def main():
             # Display evaluation results in a more compact format
             st.header("Quality Evaluation")
             
-            if not cleanlab_tlm_api_key:
+            if not st.session_state.CLEANLAB_TLM_API_KEY:
                 st.info("Enter a Cleanlab TLM API key in the sidebar to enable response evaluation.")
             elif not st.session_state.eval_results:
                 st.info("Submit a query to see evaluation results.")
@@ -935,12 +922,12 @@ def main():
                     st.session_state.remediated_response = output['result']
                     
                     # Evaluate remediated response
-                    if cleanlab_tlm_api_key:
+                    if st.session_state.CLEANLAB_TLM_API_KEY:
                         eval_results = evaluate_response(
                             query=query,  # Use original query for evaluation
                             context=str(output['source_documents']),
                             response=output['result'],
-                            api_key=cleanlab_tlm_api_key
+                            api_key=st.session_state.CLEANLAB_TLM_API_KEY
                         )
                         st.session_state.remediated_eval_results = eval_results
             
