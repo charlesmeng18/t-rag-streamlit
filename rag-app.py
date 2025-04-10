@@ -43,8 +43,8 @@ def set_api_keys():
         st.session_state.CLEANLAB_TLM_API_KEY = os.getenv('CLEANLAB_TLM_API_KEY', '')
     if 'CODEX_API_KEY' not in st.session_state:
         st.session_state.CODEX_API_KEY = os.getenv('CODEX_API_KEY', '')
-    if 'CODEX_PROJECT_ID' not in st.session_state:
-        st.session_state.CODEX_PROJECT_ID = os.getenv('CODEX_PROJECT_ID', '')
+    if 'CODEX_PROJECT_KEY' not in st.session_state:
+        st.session_state.CODEX_PROJECT_KEY = os.getenv('CODEX_PROJECT_KEY', '')
 
 # Initialize Streamlit state
 def init_session_state():
@@ -292,19 +292,20 @@ def main():
             # Get API keys from environment or Streamlit secrets
             cleanlab_tlm_key = os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")
             codex_api_key = os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")
-            codex_project_id = os.getenv('CODEX_PROJECT_ID') or st.secrets.get("CODEX_PROJECT_ID", "")
+            codex_project_key = os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")
             
-            if not cleanlab_tlm_key or not codex_api_key or not codex_project_id:
-                return {"error": "Missing Cleanlab TLM API key, Codex API key, or Codex Project ID. Please set them in environment variables or Streamlit secrets."}
+            if not cleanlab_tlm_key or not codex_api_key or not codex_project_key:
+                return {"error": "Missing Cleanlab TLM API key, Codex API key, or Codex Project Key. Please set them in environment variables or Streamlit secrets."}
             
+            # Set the API keys in the environment
             os.environ["CLEANLAB_TLM_API_KEY"] = cleanlab_tlm_key
+            os.environ["CODEX_API_KEY"] = codex_api_key
             
             # Import the Client class
             from cleanlab_codex.client import Client
             
             # Create a client and get the project
             codex_client = Client()
-            project = codex_client.get_project(project_id=codex_project_id)
             
             # Set up custom evaluation criteria for financial document analysis
             evals = get_default_evals()
@@ -342,10 +343,10 @@ def main():
             # Print debug information
             print(f"Using TLM API key: {cleanlab_tlm_key[:5]}...")
             print(f"Using Codex API key: {codex_api_key[:5]}...")
-            print(f"Using project ID: {codex_project_id}")
+            print(f"Using Codex Project Key: {codex_project_key[:5]}...")
             
             validator = Validator(
-                codex_access_key=codex_api_key,
+                codex_access_key=codex_project_key,  # Use the project key here
                 tlm_api_key=cleanlab_tlm_key,
                 bad_response_thresholds={
                     "trustworthiness": 0.7,
@@ -580,10 +581,10 @@ def main():
         if not codex_api_key:
             st.warning("Cleanlab Codex API key not found. Obtain from your Project's settings page: https://codex.cleanlab.ai/")
         
-        # Get Codex project ID from environment or secrets
-        codex_project_id = os.getenv('CODEX_PROJECT_ID') or st.secrets.get("CODEX_PROJECT_ID", "")
-        if not codex_project_id:
-            st.warning("Cleanlab Codex project ID not found. Create a project at: https://codex.cleanlab.ai/")
+        # Get Codex project key from environment or secrets
+        codex_project_key = os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")
+        if not codex_project_key:
+            st.warning("Cleanlab Codex project key not found. Obtain from your Project's settings page: https://codex.cleanlab.ai/")
         
         # Add a note about setting up secrets
         with st.expander("How to set up Cleanlab API keys"):
@@ -596,14 +597,14 @@ def main():
             4. Add the following:
             ```
             CLEANLAB_TLM_API_KEY = "your_cleanlab_tlm_api_key_here"
-            CODEX_API_KEY = "sk-xxxxxx-xxxxxx"
-            CODEX_PROJECT_ID = "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx"
+            CODEX_API_KEY = "k-xxxxxx-xxxxxx"
+            CODEX_PROJECT_KEY = "sk-xxxxxx-xxxxxx"
             ```
             
             Get your keys from:
             - TLM API key: https://tlm.cleanlab.ai/
             - Codex API key: https://codex.cleanlab.ai/ (Project settings)
-            - Codex project ID: https://codex.cleanlab.ai/ (Create a project)
+            - Codex Project Key: https://codex.cleanlab.ai/ (Project settings)
             """)
         
         st.divider()
@@ -651,7 +652,7 @@ def main():
         with st.expander("Debug API Keys"):
             st.write("CLEANLAB_TLM_API_KEY present:", bool(os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")))
             st.write("CODEX_API_KEY present:", bool(os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")))
-            st.write("CODEX_PROJECT_ID present:", bool(os.getenv('CODEX_PROJECT_ID') or st.secrets.get("CODEX_PROJECT_ID", "")))
+            st.write("CODEX_PROJECT_KEY present:", bool(os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")))
 
     # Document upload section
     st.header("Upload Documents")
