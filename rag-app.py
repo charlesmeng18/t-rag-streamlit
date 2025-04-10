@@ -339,6 +339,11 @@ def main():
                 )
             )
             
+            # Print debug information
+            print(f"Using TLM API key: {cleanlab_tlm_key[:5]}...")
+            print(f"Using Codex access key: {codex_access_key[:5]}...")
+            print(f"Using project ID: {codex_project_id}")
+            
             validator = Validator(
                 codex_access_key=codex_access_key,
                 tlm_api_key=cleanlab_tlm_key,
@@ -358,7 +363,9 @@ def main():
                     "evals": evals,
                 }
             )
-
+            
+            print("Validator created successfully")
+            
             results = validator.validate(
                 query=query,
                 context=context,
@@ -367,6 +374,7 @@ def main():
             
             return results
         except Exception as e:
+            print(f"Error in evaluate_response: {str(e)}")
             return {"error": str(e)}
 
     def create_eval_visualization(eval_results):
@@ -559,20 +567,44 @@ def main():
         # API key inputs
         openai_api_key = st.text_input("OpenAI API Key", type="password", value=os.getenv('OPENAI_API_KEY', ''))
         
+        # Cleanlab API keys section
+        st.subheader("Cleanlab API Keys")
+        
         # Get Cleanlab API key from environment or secrets
         cleanlab_tlm_api_key = os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")
         if not cleanlab_tlm_api_key:
-            st.warning("Cleanlab TLM API key not found. Some features may be limited.")
+            st.warning("Cleanlab TLM API key not found. Get your free API key from: https://tlm.cleanlab.ai/")
         
         # Get Codex access key from environment or secrets
         codex_access_key = os.getenv('CODEX_ACCESS_KEY') or st.secrets.get("CODEX_ACCESS_KEY", "")
         if not codex_access_key:
-            st.warning("Cleanlab Codex access key not found. Evaluation features may be limited.")
+            st.warning("Cleanlab Codex access key not found. Obtain from your Project's settings page: https://codex.cleanlab.ai/")
         
         # Get Codex project ID from environment or secrets
         codex_project_id = os.getenv('CODEX_PROJECT_ID') or st.secrets.get("CODEX_PROJECT_ID", "")
         if not codex_project_id:
-            st.warning("Cleanlab Codex project ID not found. Evaluation features may be limited.")
+            st.warning("Cleanlab Codex project ID not found. Create a project at: https://codex.cleanlab.ai/")
+        
+        # Add a note about setting up secrets
+        with st.expander("How to set up Cleanlab API keys"):
+            st.markdown("""
+            To set up Cleanlab API keys in Streamlit Cloud:
+            
+            1. Go to your Streamlit Cloud dashboard
+            2. Select your app
+            3. Go to "Settings" > "Secrets"
+            4. Add the following:
+            ```
+            CLEANLAB_TLM_API_KEY = "your_cleanlab_tlm_api_key_here"
+            CODEX_ACCESS_KEY = "sk-xxxxxx-xxxxxx"
+            CODEX_PROJECT_ID = "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx"
+            ```
+            
+            Get your keys from:
+            - TLM API key: https://tlm.cleanlab.ai/
+            - Codex access key: https://codex.cleanlab.ai/ (Project settings)
+            - Codex project ID: https://codex.cleanlab.ai/ (Create a project)
+            """)
         
         st.divider()
         
