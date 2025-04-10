@@ -223,7 +223,7 @@ def main():
         # Create a retriever with contextual compression
         base_retriever = vectorstore.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": 3}  # Reduced from 5 to 3 for faster retrieval
+            search_kwargs={"k": 7}  # Increased from 3 to 7 for better context coverage
         )
         
         # Set up LLM for compression and QA
