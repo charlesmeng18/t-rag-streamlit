@@ -558,8 +558,8 @@ def main():
         return st.session_state.saved_remediations.get(query)
 
     # Main content
-    st.title("PDF Document Analysis")
-    st.markdown("Upload PDF documents, ask questions, and get AI-powered insights with quality evaluation.")
+    st.title("RAG with TrustworthyRAG Evals")
+    st.markdown("Upload PDF documents, ask questions, and see quality evals from TrustworthyRAG.")
 
     # Sidebar for configuration
     with st.sidebar:
