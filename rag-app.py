@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from typing import List, Dict, Any
+import tiktoken
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -557,6 +558,11 @@ def main():
         """Get saved remediation for a query if it exists"""
         return st.session_state.saved_remediations.get(query)
 
+    def count_tokens(text):
+        """Count the number of tokens in a text using tiktoken."""
+        encoding = tiktoken.get_encoding("cl100k_base")  # OpenAI's encoding
+        return len(encoding.encode(text))
+
     # Main content
     st.title("RAG with TrustworthyRAG Evals")
     st.markdown("Steps: First upload PDF documents. Then ask RAG questions. See quality evals from TrustworthyRAG.")
@@ -814,8 +820,9 @@ def main():
                         highlighted_content = highlight_query_terms(doc.page_content, query) if 'query' in locals() else doc.page_content
                         st.markdown(f'<div class="document-preview">{highlighted_content}</div>', unsafe_allow_html=True)
                         
-                        # Show chunk metadata
-                        st.markdown(f'<div class="small-text">Chunk length: {len(doc.page_content)} characters</div>', unsafe_allow_html=True)
+                        # Show chunk metadata with token count
+                        token_count = count_tokens(doc.page_content)
+                        st.markdown(f'<div class="small-text">Chunk length: {len(doc.page_content)} characters, {token_count} tokens</div>', unsafe_allow_html=True)
         
         with col2:
             # Display evaluation results in a more compact format
