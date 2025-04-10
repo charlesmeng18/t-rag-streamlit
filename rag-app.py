@@ -38,7 +38,7 @@ def load_env_variables():
 def set_api_keys():
     """Set API keys from environment variables or Streamlit secrets"""
     if 'OPENAI_API_KEY' not in st.session_state:
-        st.session_state.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+        st.session_state.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY') or st.secrets.get("OPENAI_API_KEY", "")
     if 'CLEANLAB_TLM_API_KEY' not in st.session_state:
         st.session_state.CLEANLAB_TLM_API_KEY = os.getenv('CLEANLAB_TLM_API_KEY', '')
     if 'CODEX_API_KEY' not in st.session_state:
@@ -565,9 +565,6 @@ def main():
     with st.sidebar:
         st.header("Configuration")
         
-        # API key inputs
-        openai_api_key = st.text_input("OpenAI API Key", type="password", value=os.getenv('OPENAI_API_KEY', ''))
-        
         # Cleanlab API keys section
         st.subheader("Cleanlab API Keys")
         
@@ -650,6 +647,7 @@ def main():
 
         # Debug section (you can remove this after confirming keys are loaded)
         with st.expander("Debug API Keys"):
+            st.write("OPENAI_API_KEY present:", bool(os.getenv('OPENAI_API_KEY') or st.secrets.get("OPENAI_API_KEY", "")))
             st.write("CLEANLAB_TLM_API_KEY present:", bool(os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")))
             st.write("CODEX_API_KEY present:", bool(os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")))
             st.write("CODEX_PROJECT_KEY present:", bool(os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")))
@@ -664,11 +662,11 @@ def main():
 
     # Process uploaded files
     if uploaded_files:
-        if not openai_api_key:
-            st.error("Please enter your OpenAI API key in the sidebar.")
+        if not st.session_state.OPENAI_API_KEY:
+            st.error("OpenAI API key not found in Streamlit secrets. Please add it to your app's secrets.")
         else:
             # Only process if we have new files or the API key has changed
-            if not st.session_state.api_key_set or st.session_state.api_key_set != openai_api_key:
+            if not st.session_state.api_key_set or st.session_state.api_key_set != st.session_state.OPENAI_API_KEY:
                 with st.spinner("Processing documents..."):
                     all_documents = []
                     for uploaded_file in uploaded_files:
@@ -686,21 +684,21 @@ def main():
                         )
                         
                         # Create vector store
-                        vectorstore = create_vector_store(chunked_docs, openai_api_key)
+                        vectorstore = create_vector_store(chunked_docs, st.session_state.OPENAI_API_KEY)
                         if vectorstore:
                             st.session_state.vectorstore = vectorstore
                             
                             # Set up QA chain
                             qa_chain = setup_qa_chain(
                                 vectorstore,
-                                openai_api_key,
+                                st.session_state.OPENAI_API_KEY,
                                 model_name=model_name,
                                 temperature=temperature
                             )
                             
                             if qa_chain:
                                 st.session_state.qa_chain = qa_chain
-                                st.session_state.api_key_set = openai_api_key
+                                st.session_state.api_key_set = st.session_state.OPENAI_API_KEY
                                 st.success(f"✅ Processed {len(all_documents)} document pages with {len(chunked_docs)} chunks")
 
     # Document stats
@@ -767,7 +765,7 @@ def main():
                                 llm=ChatOpenAI(
                                     temperature=0,
                                     model=model_name,
-                                    openai_api_key=openai_api_key
+                                    openai_api_key=st.session_state.OPENAI_API_KEY
                                 ),
                                 chain_type="stuff",
                                 retriever=st.session_state.qa_chain.retriever,
@@ -788,7 +786,7 @@ def main():
                                 fast_llm = ChatOpenAI(
                                     temperature=0, 
                                     model="gpt-3.5-turbo",
-                                    openai_api_key=openai_api_key
+                                    openai_api_key=st.session_state.OPENAI_API_KEY
                                 )
                                 
                                 # Simplified prompt for faster processing
@@ -950,7 +948,7 @@ def main():
                         llm=ChatOpenAI(
                             temperature=0,
                             model=model_name,
-                            openai_api_key=openai_api_key
+                            openai_api_key=st.session_state.OPENAI_API_KEY
                         ),
                         chain_type="stuff",
                         retriever=st.session_state.qa_chain.retriever,
