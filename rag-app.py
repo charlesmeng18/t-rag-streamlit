@@ -596,6 +596,11 @@ def main():
             st.session_state.saved_remediations = {}
             st.success("All saved remediations have been cleared.")
 
+        # Debug section (you can remove this after confirming keys are loaded)
+        with st.expander("Debug API Keys"):
+            st.write("CLEANLAB_TLM_API_KEY present:", bool(os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")))
+            st.write("CODEX_API_KEY present:", bool(os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")))
+
     # Document upload section
     st.header("Upload Documents")
     uploaded_files = st.file_uploader(
