@@ -559,7 +559,7 @@ def main():
 
     # Main content
     st.title("RAG with TrustworthyRAG Evals")
-    st.markdown("Upload PDF documents, ask questions, and see quality evals from TrustworthyRAG.")
+    st.markdown("Steps: First upload PDF documents. Then ask RAG questions. See quality evals from TrustworthyRAG.")
 
     # Sidebar for configuration
     with st.sidebar:
