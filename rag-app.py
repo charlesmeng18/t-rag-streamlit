@@ -289,13 +289,13 @@ def main():
             return {"error": "Cleanlab modules not available. Install with pip install cleanlab-tlm cleanlab-codex"}
         
         try:
-            # Get API keys from environment or Streamlit secrets
-            cleanlab_tlm_key = os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")
-            codex_api_key = os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")
-            codex_project_key = os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")
+            # Get API keys from session state
+            cleanlab_tlm_key = st.session_state.CLEANLAB_TLM_API_KEY
+            codex_api_key = st.session_state.CODEX_API_KEY
+            codex_project_key = st.session_state.CODEX_PROJECT_KEY
             
             if not cleanlab_tlm_key or not codex_api_key or not codex_project_key:
-                return {"error": "Missing Cleanlab TLM API key, Codex API key, or Codex Project Key. Please set them in environment variables or Streamlit secrets."}
+                return {"error": "Missing Cleanlab TLM API key, Codex API key, or Codex Project Key. Please set them in the sidebar."}
             
             # Set the API keys in the environment
             os.environ["CLEANLAB_TLM_API_KEY"] = cleanlab_tlm_key
@@ -565,40 +565,51 @@ def main():
     with st.sidebar:
         st.header("Configuration")
         
+        # API key inputs
+        st.subheader("API Keys")
+        
+        # OpenAI API key input
+        openai_api_key = st.text_input("OpenAI API Key", type="password", value=st.session_state.OPENAI_API_KEY)
+        if openai_api_key != st.session_state.OPENAI_API_KEY:
+            st.session_state.OPENAI_API_KEY = openai_api_key
+            st.session_state.api_key_set = False
+        
         # Cleanlab API keys section
         st.subheader("Cleanlab API Keys")
         
         # Get Cleanlab API key from environment or secrets
-        cleanlab_tlm_api_key = os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")
-        if not cleanlab_tlm_api_key:
-            st.warning("Cleanlab TLM API key not found. Get your free API key from: https://tlm.cleanlab.ai/")
+        cleanlab_tlm_api_key = st.text_input("Cleanlab TLM API Key", type="password", value=st.session_state.CLEANLAB_TLM_API_KEY)
+        if cleanlab_tlm_api_key != st.session_state.CLEANLAB_TLM_API_KEY:
+            st.session_state.CLEANLAB_TLM_API_KEY = cleanlab_tlm_api_key
         
         # Get Codex API key from environment or secrets
-        codex_api_key = os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")
-        if not codex_api_key:
-            st.warning("Cleanlab Codex API key not found. Obtain from your Project's settings page: https://codex.cleanlab.ai/")
+        codex_api_key = st.text_input("Cleanlab Codex API Key", type="password", value=st.session_state.CODEX_API_KEY)
+        if codex_api_key != st.session_state.CODEX_API_KEY:
+            st.session_state.CODEX_API_KEY = codex_api_key
         
         # Get Codex project key from environment or secrets
-        codex_project_key = os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")
-        if not codex_project_key:
-            st.warning("Cleanlab Codex project key not found. Obtain from your Project's settings page: https://codex.cleanlab.ai/")
+        codex_project_key = st.text_input("Cleanlab Codex Project Key", type="password", value=st.session_state.CODEX_PROJECT_KEY)
+        if codex_project_key != st.session_state.CODEX_PROJECT_KEY:
+            st.session_state.CODEX_PROJECT_KEY = codex_project_key
         
         # Add a note about setting up secrets
-        with st.expander("How to set up Cleanlab API keys"):
+        with st.expander("How to set up API keys"):
             st.markdown("""
-            To set up Cleanlab API keys in Streamlit Cloud:
+            To set up API keys in Streamlit Cloud:
             
             1. Go to your Streamlit Cloud dashboard
             2. Select your app
             3. Go to "Settings" > "Secrets"
             4. Add the following:
             ```
+            OPENAI_API_KEY = "your_openai_api_key_here"
             CLEANLAB_TLM_API_KEY = "your_cleanlab_tlm_api_key_here"
             CODEX_API_KEY = "k-xxxxxx-xxxxxx"
             CODEX_PROJECT_KEY = "sk-xxxxxx-xxxxxx"
             ```
             
             Get your keys from:
+            - OpenAI API key: https://platform.openai.com/api-keys
             - TLM API key: https://tlm.cleanlab.ai/
             - Codex API key: https://codex.cleanlab.ai/ (Project settings)
             - Codex Project Key: https://codex.cleanlab.ai/ (Project settings)
@@ -617,15 +628,10 @@ def main():
         st.subheader("Model Settings")
         model_name = st.selectbox(
             "OpenAI Model",
-            ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4o"],
-            index=0  # Default to gpt-3.5-turbo for speed
+            ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4o"],
+            index=0  # Default to gpt-4o-mini
         )
         temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.0, step=0.1)
-        
-        # Speed optimization options
-        st.subheader("Speed Optimization")
-        use_fast_mode = st.checkbox("Use Fast Mode", value=True, 
-                                   help="Reduces context size and uses faster retrieval for quicker responses")
         
         # Reset button
         if st.button("Reset Application"):
@@ -647,10 +653,10 @@ def main():
 
         # Debug section (you can remove this after confirming keys are loaded)
         with st.expander("Debug API Keys"):
-            st.write("OPENAI_API_KEY present:", bool(os.getenv('OPENAI_API_KEY') or st.secrets.get("OPENAI_API_KEY", "")))
-            st.write("CLEANLAB_TLM_API_KEY present:", bool(os.getenv('CLEANLAB_TLM_API_KEY') or st.secrets.get("CLEANLAB_TLM_API_KEY", "")))
-            st.write("CODEX_API_KEY present:", bool(os.getenv('CODEX_API_KEY') or st.secrets.get("CODEX_API_KEY", "")))
-            st.write("CODEX_PROJECT_KEY present:", bool(os.getenv('CODEX_PROJECT_KEY') or st.secrets.get("CODEX_PROJECT_KEY", "")))
+            st.write("OPENAI_API_KEY present:", bool(st.session_state.OPENAI_API_KEY))
+            st.write("CLEANLAB_TLM_API_KEY present:", bool(st.session_state.CLEANLAB_TLM_API_KEY))
+            st.write("CODEX_API_KEY present:", bool(st.session_state.CODEX_API_KEY))
+            st.write("CODEX_PROJECT_KEY present:", bool(st.session_state.CODEX_PROJECT_KEY))
 
     # Document upload section
     st.header("Upload Documents")
@@ -774,39 +780,7 @@ def main():
                             )
                             output = remediation_qa(query)
                         else:
-                            # Apply fast mode optimizations if enabled
-                            if use_fast_mode:
-                                # Create a temporary QA chain with optimized settings
-                                temp_retriever = st.session_state.vectorstore.as_retriever(
-                                    search_type="similarity",
-                                    search_kwargs={"k": 2}  # Even fewer documents for faster retrieval
-                                )
-                                
-                                # Use a smaller model for faster processing
-                                fast_llm = ChatOpenAI(
-                                    temperature=0, 
-                                    model="gpt-3.5-turbo",
-                                    openai_api_key=st.session_state.OPENAI_API_KEY
-                                )
-                                
-                                # Simplified prompt for faster processing
-                                fast_prompt = PromptTemplate(
-                                    template="Answer the question based on the context: {context}\n\nQuestion: {question}\n\nAnswer:",
-                                    input_variables=["context", "question"]
-                                )
-                                
-                                # Create a fast QA chain
-                                fast_qa = RetrievalQA.from_chain_type(
-                                    llm=fast_llm,
-                                    chain_type="stuff",
-                                    retriever=temp_retriever,
-                                    return_source_documents=True,
-                                    chain_type_kwargs={"prompt": fast_prompt}
-                                )
-                                
-                                output = fast_qa(query)
-                            else:
-                                output = st.session_state.qa_chain(query)
+                            output = st.session_state.qa_chain(query)
                         
                         # Store response and retrieved docs
                         st.session_state.response = output['result']
