@@ -18,10 +18,11 @@ from langchain.prompts import PromptTemplate
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain.schema import Document
+from braintrust import init_logger, traced
 
-# Import and initialize Braintrust
+# Import Braintrust for logging
 try:
-    from braintrust import Braintrust, Eval, Score
+    from braintrust import init_logger, traced
     has_braintrust = True
 except ImportError:
     has_braintrust = False
@@ -109,8 +110,12 @@ def main():
     set_api_keys()
     
     # Initialize Braintrust if API key is available
-    if has_braintrust and st.session_state.BRAINTRUST_API_KEY and not st.session_state.braintrust_experiment:
-        st.session_state.braintrust_experiment = init_braintrust()
+    if has_braintrust and st.session_state.BRAINTRUST_API_KEY:
+        os.environ["BRAINTRUST_API_KEY"] = st.session_state.BRAINTRUST_API_KEY
+        st.session_state.braintrust_logger = init_logger(
+            project="rag-streamlit-app",  # Your project name
+            api_key=st.session_state.BRAINTRUST_API_KEY
+        )
     
     # Set page configuration
     set_page_config()
@@ -234,6 +239,7 @@ def main():
             st.error(f"Error creating vector store: {e}")
             return None
 
+    @traced
     def setup_qa_chain(vectorstore, openai_api_key, model_name="gpt-3.5-turbo", temperature=0):
         """Set up the QA chain for financial document analysis"""
         if not vectorstore:
@@ -581,6 +587,15 @@ def main():
         encoding = tiktoken.get_encoding("cl100k_base")  # OpenAI's encoding
         return len(encoding.encode(text))
 
+    @traced
+    def process_query(query, qa_chain, model_name):
+        """Process a query through the QA chain and return results"""
+        output = qa_chain(query)
+        return {
+            "result": output['result'],
+            "source_documents": output['source_documents']
+        }
+
     # Main content
     st.title("RAG with TrustworthyRAG Evals")
     st.markdown("Steps: First upload PDF documents. Then ask RAG questions. See quality evals from TrustworthyRAG.")
@@ -810,7 +825,7 @@ def main():
                                     }
                                 )
                         else:
-                            output = st.session_state.qa_chain(query)
+                            output = process_query(query, st.session_state.qa_chain, model_name)
                             
                             # Log to Braintrust
                             if st.session_state.braintrust_experiment:
