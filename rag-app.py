@@ -1068,14 +1068,11 @@ def init_braintrust():
     try:
         bt = Braintrust(api_key=api_key)
         experiment = bt.init_experiment(
+            project_id="ee69c1b5-d8c1-421f-84f8-285d9a9e73f7",  # Replace with actual ID from Braintrust dashboard
             project="rag-streamlit-app",
-            experiment_name=f"RAG Session {st.session_state.session_id}",
-            metadata={
-                "session_id": st.session_state.session_id,
-                "timestamp": time.time(),
-                "app_version": "1.0.0"
-            }
+            experiment_name=f"RAG Session {st.session_state.session_id}"
         )
+        print(f"Braintrust experiment initialized: {experiment.id if experiment else 'Failed'}")
         return experiment
     except Exception as e:
         st.error(f"Error initializing Braintrust: {str(e)}")
