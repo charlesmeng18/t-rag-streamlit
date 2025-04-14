@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.express as px
 from typing import List, Dict, Any
 import tiktoken
+import uuid
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -17,6 +18,13 @@ from langchain.prompts import PromptTemplate
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain.schema import Document
+
+# Import and initialize Braintrust
+try:
+    from braintrust import Braintrust, Eval, Score
+    has_braintrust = True
+except ImportError:
+    has_braintrust = False
 
 # Import Cleanlab evaluation tools if API key provided
 try:
@@ -46,6 +54,8 @@ def set_api_keys():
         st.session_state.CODEX_API_KEY = os.getenv('CODEX_API_KEY', '')
     if 'CODEX_PROJECT_KEY' not in st.session_state:
         st.session_state.CODEX_PROJECT_KEY = os.getenv('CODEX_PROJECT_KEY', '')
+    if 'BRAINTRUST_API_KEY' not in st.session_state:
+        st.session_state.BRAINTRUST_API_KEY = os.getenv('BRAINTRUST_API_KEY', '') or st.secrets.get("BRAINTRUST_API_KEY", "")
 
 # Initialize Streamlit state
 def init_session_state():
@@ -60,6 +70,8 @@ def init_session_state():
         st.session_state.api_key_set = False
     if 'eval_results' not in st.session_state:
         st.session_state.eval_results = None
+    if 'braintrust_experiment' not in st.session_state:
+        st.session_state.braintrust_experiment = None
     if 'retrieved_docs' not in st.session_state:
         st.session_state.retrieved_docs = []
     if 'response' not in st.session_state:
@@ -72,6 +84,8 @@ def init_session_state():
         st.session_state.remediated_eval_results = None
     if 'saved_remediations' not in st.session_state:
         st.session_state.saved_remediations = {}
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
 
 # Set page configuration
 def set_page_config():
@@ -93,6 +107,10 @@ def main():
     
     # Set API keys
     set_api_keys()
+    
+    # Initialize Braintrust if API key is available
+    if has_braintrust and st.session_state.BRAINTRUST_API_KEY and not st.session_state.braintrust_experiment:
+        st.session_state.braintrust_experiment = init_braintrust()
     
     # Set page configuration
     set_page_config()
@@ -579,11 +597,13 @@ def main():
         cleanlab_tlm_key_status = "✅ Present" if st.session_state.CLEANLAB_TLM_API_KEY else "❌ Missing"
         codex_api_key_status = "✅ Present" if st.session_state.CODEX_API_KEY else "❌ Missing"
         codex_project_key_status = "✅ Present" if st.session_state.CODEX_PROJECT_KEY else "❌ Missing"
+        braintrust_api_key_status = "✅ Present" if st.session_state.BRAINTRUST_API_KEY else "❌ Missing"
         
         st.markdown(f"**OpenAI API Key:** {openai_key_status}")
         st.markdown(f"**Cleanlab TLM API Key:** {cleanlab_tlm_key_status}")
         st.markdown(f"**Cleanlab Codex API Key:** {codex_api_key_status}")
         st.markdown(f"**Cleanlab Codex Project Key:** {codex_project_key_status}")
+        st.markdown(f"**Braintrust API Key:** {braintrust_api_key_status}")
         
         # Add a note about setting up secrets
         with st.expander("How to set up API keys"):
@@ -599,6 +619,7 @@ def main():
             CLEANLAB_TLM_API_KEY = "your_cleanlab_tlm_api_key_here"
             CODEX_API_KEY = "k-xxxxxx-xxxxxx"
             CODEX_PROJECT_KEY = "sk-xxxxxx-xxxxxx"
+            BRAINTRUST_API_KEY = "bt_xxxxxx"
             ```
             
             Get your keys from:
@@ -606,6 +627,7 @@ def main():
             - TLM API key: https://tlm.cleanlab.ai/
             - Codex API key: https://codex.cleanlab.ai/ (Project settings)
             - Codex Project Key: https://codex.cleanlab.ai/ (Project settings)
+            - Braintrust API key: https://www.braintrust.dev/account
             """)
         
         st.divider()
@@ -650,6 +672,8 @@ def main():
             st.write("CLEANLAB_TLM_API_KEY present:", bool(st.session_state.CLEANLAB_TLM_API_KEY))
             st.write("CODEX_API_KEY present:", bool(st.session_state.CODEX_API_KEY))
             st.write("CODEX_PROJECT_KEY present:", bool(st.session_state.CODEX_PROJECT_KEY))
+            st.write("BRAINTRUST_API_KEY present:", bool(st.session_state.BRAINTRUST_API_KEY))
+            st.write("Braintrust experiment:", "Initialized" if st.session_state.braintrust_experiment else "Not initialized")
 
     # Document upload section
     st.header("Upload Documents")
@@ -772,8 +796,33 @@ def main():
                                 chain_type_kwargs={"prompt": remediation_prompt}
                             )
                             output = remediation_qa(query)
+                            
+                            # Log to Braintrust with remediation info
+                            if st.session_state.braintrust_experiment:
+                                log_to_braintrust(
+                                    query=query,
+                                    context_docs=output['source_documents'],
+                                    response=output['result'],
+                                    metadata={
+                                        "is_remediated": True,
+                                        "remediation_instructions": saved_remediation['instructions'],
+                                        "model": model_name
+                                    }
+                                )
                         else:
                             output = st.session_state.qa_chain(query)
+                            
+                            # Log to Braintrust
+                            if st.session_state.braintrust_experiment:
+                                log_to_braintrust(
+                                    query=query,
+                                    context_docs=output['source_documents'],
+                                    response=output['result'],
+                                    metadata={
+                                        "is_remediated": False,
+                                        "model": model_name
+                                    }
+                                )
                         
                         # Store response and retrieved docs
                         st.session_state.response = output['result']
@@ -784,7 +833,7 @@ def main():
                         
                         # Evaluate if API key provided
                         if st.session_state.CLEANLAB_TLM_API_KEY:
-                            with st.spinner("Evaluating response quality..."):
+                            with st.spinner("Evaluating response quality with Cleanlab..."):
                                 eval_results = evaluate_response(
                                     query=query,
                                     context=str(output['source_documents']),
@@ -825,54 +874,84 @@ def main():
                         st.markdown(f'<div class="small-text">Chunk length: {len(doc.page_content)} characters, {token_count} tokens</div>', unsafe_allow_html=True)
         
         with col2:
-            # Display evaluation results in a more compact format
-            st.header("Quality Evaluation")
+            # Create tabs for different evaluations
+            eval_tabs = st.tabs(["Cleanlab Evaluation", "Braintrust Logs"])
             
-            if not st.session_state.CLEANLAB_TLM_API_KEY:
-                st.info("Enter a Cleanlab TLM API key in the sidebar to enable response evaluation.")
-            elif not st.session_state.eval_results:
-                st.info("Submit a query to see evaluation results.")
-            elif "error" in st.session_state.eval_results:
-                st.error(f"Evaluation error: {st.session_state.eval_results['error']}")
-            else:
-                # Create visualization
-                eval_viz = create_eval_visualization(st.session_state.eval_results)
-                if eval_viz:
-                    st.plotly_chart(eval_viz, use_container_width=True)
+            # Cleanlab evaluation tab
+            with eval_tabs[0]:
+                st.header("Cleanlab Quality Evaluation")
+                
+                if not st.session_state.CLEANLAB_TLM_API_KEY:
+                    st.info("Enter a Cleanlab TLM API key in the sidebar to enable response evaluation.")
+                elif not st.session_state.eval_results:
+                    st.info("Submit a query to see evaluation results.")
+                elif "error" in st.session_state.eval_results:
+                    st.error(f"Evaluation error: {st.session_state.eval_results['error']}")
+                else:
+                    # Create visualization
+                    eval_viz = create_eval_visualization(st.session_state.eval_results)
+                    if eval_viz:
+                        st.plotly_chart(eval_viz, use_container_width=True)
+                        
+                        # Display numerical scores
+                        st.subheader("Numerical Scores")
+                        for metric, value in st.session_state.eval_results.items():
+                            if isinstance(value, dict) and "score" in value:
+                                score = value["score"]
+                                metric_name = metric.replace("_", " ").title()
+                                st.metric(metric_name, f"{score:.2f}")
+                        
+                        # Generate and display natural language explanation in a more compact format
+                        explanation = generate_evaluation_explanation(st.session_state.eval_results)
+                        with st.expander("View Evaluation Details"):
+                            st.markdown(explanation)
+            
+            # Braintrust logs tab
+            with eval_tabs[1]:
+                st.header("Braintrust Logging")
+                
+                if not st.session_state.BRAINTRUST_API_KEY:
+                    st.info("Enter a Braintrust API key in the sidebar to enable logging and evaluation.")
+                elif not st.session_state.braintrust_experiment:
+                    st.info("Braintrust experiment not initialized. Please check your API key.")
+                else:
+                    st.success("✅ Braintrust logging is active")
+                    st.markdown("""
+                    All queries and responses are being logged to your Braintrust account for:
+                    - Quality monitoring 
+                    - Performance tracking
+                    - LLM response evaluation
+                    """)
                     
-                    # Display numerical scores
-                    st.subheader("Numerical Scores")
-                    for metric, value in st.session_state.eval_results.items():
-                        if isinstance(value, dict) and "score" in value:
-                            score = value["score"]
-                            metric_name = metric.replace("_", " ").title()
-                            st.metric(metric_name, f"{score:.2f}")
+                    # Show link to Braintrust dashboard
+                    experiment_id = getattr(st.session_state.braintrust_experiment, 'id', None)
+                    if experiment_id:
+                        st.markdown(f"[View logs on Braintrust Dashboard](https://www.braintrust.dev/experiments/{experiment_id})")
                     
-                    # Generate and display natural language explanation in a more compact format
-                    explanation = generate_evaluation_explanation(st.session_state.eval_results)
-                    with st.expander("View Evaluation Details"):
-                        st.markdown(explanation)
+                    # Show session information
+                    st.subheader("Current Session Info")
+                    st.markdown(f"**Session ID:** `{st.session_state.session_id}`")
+                    st.markdown(f"**Experiment ID:** `{experiment_id or 'Not available'}`")
                     
-                    # Display remediated evaluation if available
-                    if st.session_state.remediated_eval_results:
-                        st.divider()
-                        st.subheader("Remediated Evaluation")
-                        remediated_eval_viz = create_eval_visualization(st.session_state.remediated_eval_results)
-                        if remediated_eval_viz:
-                            st.plotly_chart(remediated_eval_viz, use_container_width=True)
-                            
-                            # Display numerical scores for remediated results
-                            st.subheader("Remediated Numerical Scores")
-                            for metric, value in st.session_state.remediated_eval_results.items():
-                                if isinstance(value, dict) and "score" in value:
-                                    score = value["score"]
-                                    metric_name = metric.replace("_", " ").title()
-                                    st.metric(metric_name, f"{score:.2f}")
-                            
-                            # Generate and display natural language explanation in a more compact format
-                            remediated_explanation = generate_evaluation_explanation(st.session_state.remediated_eval_results)
-                            with st.expander("View Remediated Evaluation Details"):
-                                st.markdown(remediated_explanation)
+                    # Add note about Braintrust evaluations
+                    with st.expander("About Braintrust Logging"):
+                        st.markdown("""
+                        Braintrust automatically logs:
+                        
+                        - User queries (prompts)
+                        - Retrieved context documents
+                        - Model responses
+                        - Metadata about your session
+                        
+                        The Braintrust platform provides:
+                        
+                        - Automatic evaluation of responses
+                        - Quality metrics and scoring
+                        - Performance monitoring over time
+                        - Prompt analysis and improvement suggestions
+                        
+                        Visit [Braintrust](https://www.braintrust.dev) to see your data and analytics.
+                        """)
         
         with col3:
             # Remediation Panel
@@ -928,6 +1007,20 @@ def main():
                     # Store remediated response
                     st.session_state.remediated_response = output['result']
                     
+                    # Log remediated response to Braintrust
+                    if st.session_state.braintrust_experiment:
+                        log_to_braintrust(
+                            query=query,
+                            context_docs=output['source_documents'],
+                            response=output['result'],
+                            metadata={
+                                "is_remediated": True,
+                                "remediation_instructions": st.session_state.remediation_instructions,
+                                "model": model_name,
+                                "remediation_type": remediation_option
+                            }
+                        )
+                    
                     # Evaluate remediated response
                     if st.session_state.CLEANLAB_TLM_API_KEY:
                         eval_results = evaluate_response(
@@ -960,6 +1053,75 @@ def main():
         SEC 10-Q Analysis App - Built with Streamlit, LangChain, and Cleanlab TLM
     </div>
     """, unsafe_allow_html=True)
+
+# Initialize Braintrust
+def init_braintrust():
+    """Initialize Braintrust for logging and evaluation"""
+    if not has_braintrust:
+        st.warning("Braintrust module not available. Install with pip install braintrust")
+        return None
+    
+    api_key = st.session_state.BRAINTRUST_API_KEY
+    if not api_key:
+        return None
+    
+    try:
+        bt = Braintrust(api_key=api_key)
+        experiment = bt.init_experiment(
+            project="rag-streamlit-app",
+            experiment_name=f"RAG Session {st.session_state.session_id}",
+            metadata={
+                "session_id": st.session_state.session_id,
+                "timestamp": time.time(),
+                "app_version": "1.0.0"
+            }
+        )
+        return experiment
+    except Exception as e:
+        st.error(f"Error initializing Braintrust: {str(e)}")
+        return None
+
+# Log to Braintrust
+def log_to_braintrust(query, context_docs, response, metadata=None):
+    """Log query, context, and response to Braintrust"""
+    if not has_braintrust or not st.session_state.braintrust_experiment:
+        return None
+    
+    try:
+        # Format context as a string
+        context = "\n\n".join([doc.page_content for doc in context_docs])
+        
+        # Prepare metadata
+        log_metadata = {
+            "model": metadata.get("model", "openai/gpt-4o-mini"),
+            "num_docs": len(context_docs),
+            "session_id": st.session_state.session_id,
+            "timestamp": time.time()
+        }
+        
+        # Add any additional metadata
+        if metadata:
+            log_metadata.update(metadata)
+        
+        # Log the span
+        span = st.session_state.braintrust_experiment.log({
+            "input": {
+                "query": query,
+                "context": context
+            },
+            "output": response,
+            "expected": None,  # No ground truth in this case
+            "scores": {
+                # Auto-eval scores
+                "auto_eval": Score(auto=True, evaluators=["openai/gpt-4o-mini"])
+            },
+            "metadata": log_metadata
+        })
+        
+        return span
+    except Exception as e:
+        print(f"Error logging to Braintrust: {str(e)}")
+        return None
 
 if __name__ == "__main__":
     main()

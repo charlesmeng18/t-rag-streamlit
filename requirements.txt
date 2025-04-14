@@ -9,3 +9,5 @@ faiss-cpu>=1.7.4
 pypdf>=3.0.0
 cleanlab-tlm>=0.0.5
 cleanlab-codex>=0.0.1
+braintrust>=0.0.30
+tiktoken>=0.5.0
